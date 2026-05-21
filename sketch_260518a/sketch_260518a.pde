@@ -1,9 +1,13 @@
 import processing.sound.*;
 SoundFile musicaDeFundo;
 
-// Imagens globais para as folhas de sprites
+// Imagens globais para as folhas de sprites do jogador
 PImage spriteIdle, spriteRun, spriteAttack, spriteJump;
 PImage[] framesIdle, framesRun, framesAttack, framesJump;
+
+// MODIFICADO: Novas imagens globais para as folhas de sprites do Lobo (Inimigo Vermelho)
+PImage spriteWolfRun, spriteWolfAttack;
+PImage[] framesWolfRun, framesWolfAttack;
 
 ArrayList<Block> blocks = new ArrayList<Block>();
 ArrayList<Enemy> enemies = new ArrayList<Enemy>();
@@ -89,17 +93,25 @@ void setup() {
   musicaDeFundo = new SoundFile(this, "tapao_na_raba_8bit.mp3");
   musicaDeFundo.loop();
   
-  // Carrega as folhas de sprites
+  // Carrega as folhas de sprites do jogador
   spriteIdle = loadImage("Idle.png");
   spriteRun = loadImage("Run.png");
   spriteAttack = loadImage("Attack_1.png");
   spriteJump = loadImage("Jump.png");
   
-  // MODIFICADO: Ajustado o número de colunas reais das suas imagens (96x96 cada frame)
+  // MODIFICADO: Carrega as folhas de sprites do Lobo (Inimigo Vermelho)
+  spriteWolfRun = loadImage("Wolf_Run.png");
+  spriteWolfAttack = loadImage("Wolf_Run+Attack.png");
+  
+  // Ajustado o número de colunas reais das imagens do jogador (96x96 cada frame)
   framesIdle = recortarSprites(spriteIdle, 6);
-  framesRun = recortarSprites(spriteRun, 6);       // Ajustado de 8 para 6 colunas
+  framesRun = recortarSprites(spriteRun, 6);
   framesAttack = recortarSprites(spriteAttack, 4);
-  framesJump = recortarSprites(spriteJump, 8);      // Ajustado de 10 para 8 colunas
+  framesJump = recortarSprites(spriteJump, 8);
+  
+  // MODIFICADO: Recorta as animações do lobo baseadas no número exato de frames das folhas (128x128 cada)
+  framesWolfRun = recortarSprites(spriteWolfRun, 9);      // Wolf_Run tem 9 frames
+  framesWolfAttack = recortarSprites(spriteWolfAttack, 7);  // Wolf_Run+Attack tem 7 frames
 }
 
 // Função auxiliar para fatiar horizontalmente a folha de sprites
@@ -599,7 +611,6 @@ class Player {
       frameAtual = framesAttack[idx];
     } 
     else if (!grounded) {
-      // MODIFICADO: Mapeia perfeitamente a velocidade vertical (vy) ao longo dos 8 frames da folha de pulo
       int idx = int(map(vy, -14.2, 15, 0, framesJump.length));
       idx = constrain(idx, 0, framesJump.length - 1);
       frameAtual = framesJump[idx];
@@ -670,7 +681,7 @@ class Enemy {
     this.x = x; this.y = y; this.startY = y; this.type = type;
     if (type == 0) { hp = 2; w = 48; h = 32; }
     if (type == 1) { hp = 1; w = 44; h = 44; y -= 45; startY = y; }
-    if (type == 2) { hp = 3; w = 50; h = 42; }
+    if (type == 2) { hp = 3; w = 50; h = 42; } // Inimigo Vermelho (Hunter)
   }
 
   void update() {
@@ -751,7 +762,7 @@ class Enemy {
     if (dir < 0) scale(-1, 1);
     if (type == 0) drawCrawler();
     if (type == 1) drawFlyer();
-    if (type == 2) drawHunter();
+    if (type == 2) drawHunter(); // MODIFICADO: Passou a carregar as spritesheets do lobo
     popMatrix();
   }
 
@@ -771,13 +782,40 @@ class Enemy {
     fill(0); ellipse(-8, -5, 4, 5); ellipse(8, -5, 4, 5);
   }
 
+  // MODIFICADO: Substituídos os blocos geométricos originais pelas animações fluidas do lobo
   void drawHunter() {
-    float step = sin(frameCount * 0.25) * 4; noStroke();
-    fill(hurtCooldown > 0 ? color(255, 215, 230) : color(76, 44, 82)); rect(-w / 2, -h / 2, w, h, 12);
-    fill(230); ellipse(-11, -9, 13, 13); ellipse(11, -9, 13, 13);
-    fill(0); ellipse(-11, -9, 5, 5); ellipse(11, -9, 5, 5);
-    stroke(220, 80, 130); strokeWeight(4); line(-12, 16, -18 + step, 31); line(12, 16, 18 - step, 31);
-    fill(230); triangle(-18, -18, -8, -36, 0, -18); triangle(18, -18, 8, -36, 0, -18);
+    float dx = player.x - x;
+    // Verifica se o lobo detectou o jogador baseado no raio de visão original
+    boolean sees = abs(dx) < 360 && abs(player.y - y) < 170;
+    
+    PImage frameAtual;
+    if (sees) {
+      // Se estiver perseguindo, usa a animação agressiva (7 frames) em velocidade rápida
+      int idx = (frameCount / 4) % framesWolfAttack.length;
+      frameAtual = framesWolfAttack[idx];
+    } else {
+      // Se estiver calmo patrulhando, usa a animação estável de corrida (9 frames)
+      int idx = (frameCount / 5) % framesWolfRun.length;
+      frameAtual = framesWolfRun[idx];
+    }
+    
+    if (frameAtual != null) {
+      // Escalona a imagem quadrada (128x128) para casar de forma proporcional com a colisão do jogo
+      float renderH = h * 1.35; 
+      float renderW = renderH; 
+      
+      if (hurtCooldown > 0) {
+        tint(255, 100, 100); // Pisca em vermelho ao sofrer dano do jogador
+      }
+      
+      imageMode(CENTER);
+      // O offset de Y ajusta dinamicamente as patas na linha do chão de acordo com o tamanho do colisor
+      image(frameAtual, 0, (h - renderH) / 2, renderW, renderH);
+      
+      if (hurtCooldown > 0) {
+        noTint();
+      }
+    }
   }
 }
 
