@@ -5,9 +5,17 @@ SoundFile musicaDeFundo;
 PImage spriteIdle, spriteRun, spriteAttack, spriteJump;
 PImage[] framesIdle, framesRun, framesAttack, framesJump;
 
-// MODIFICADO: Novas imagens globais para as folhas de sprites do Lobo (Inimigo Vermelho)
+// Imagens globais para as folhas de sprites do Lobo (Inimigo Vermelho)
 PImage spriteWolfRun, spriteWolfAttack;
 PImage[] framesWolfRun, framesWolfAttack;
+
+// Novas imagens globais para o Esqueleto (Monstro Azul "C")
+PImage spriteSkeletoWalk, spriteSkeletoAttack;
+PImage[] framesSkeletoWalk, framesSkeletoAttack;
+
+// Novas imagens globais para o Minotauro (Boss "B")
+PImage spriteMinotauroWalk, spriteMinotauroAttack;
+PImage[] framesMinotauroWalk, framesMinotauroAttack;
 
 ArrayList<Block> blocks = new ArrayList<Block>();
 ArrayList<Enemy> enemies = new ArrayList<Enemy>();
@@ -99,19 +107,35 @@ void setup() {
   spriteAttack = loadImage("Attack_1.png");
   spriteJump = loadImage("Jump.png");
   
-  // MODIFICADO: Carrega as folhas de sprites do Lobo (Inimigo Vermelho)
+  // Carrega as folhas de sprites do Lobo (Inimigo Vermelho)
   spriteWolfRun = loadImage("Wolf_Run.png");
   spriteWolfAttack = loadImage("Wolf_Run+Attack.png");
   
-  // Ajustado o número de colunas reais das imagens do jogador (96x96 cada frame)
+  // Carrega as folhas de sprites do Esqueleto (Monstro Azul)
+  spriteSkeletoWalk = loadImage("skeleto_Walk.png");
+  spriteSkeletoAttack = loadImage("skeleto_Run+attack.png");
+  
+  // Carrega as folhas de sprites do Minotauro (Boss)
+  spriteMinotauroWalk = loadImage("minotauro_Walk.png");
+  spriteMinotauroAttack = loadImage("minotauro_Attack.png");
+  
+  // Recorta as animações do jogador (96x96 cada frame)
   framesIdle = recortarSprites(spriteIdle, 6);
   framesRun = recortarSprites(spriteRun, 6);
   framesAttack = recortarSprites(spriteAttack, 4);
   framesJump = recortarSprites(spriteJump, 8);
   
-  // MODIFICADO: Recorta as animações do lobo baseadas no número exato de frames das folhas (128x128 cada)
-  framesWolfRun = recortarSprites(spriteWolfRun, 9);      // Wolf_Run tem 9 frames
-  framesWolfAttack = recortarSprites(spriteWolfAttack, 7);  // Wolf_Run+Attack tem 7 frames
+  // Recorta as animações do lobo (128x128 cada)
+  framesWolfRun = recortarSprites(spriteWolfRun, 9);      
+  framesWolfAttack = recortarSprites(spriteWolfAttack, 7);  
+  
+  // Recorta as animações do Esqueleto baseado nas imagens enviadas (7 frames cada)
+  framesSkeletoWalk = recortarSprites(spriteSkeletoWalk, 7);
+  framesSkeletoAttack = recortarSprites(spriteSkeletoAttack, 7);
+  
+  // CORRIGIDO: O Minotauro Walk tem 12 frames na spritesheet (1536x128px), não 18!
+  framesMinotauroWalk = recortarSprites(spriteMinotauroWalk, 12);
+  framesMinotauroAttack = recortarSprites(spriteMinotauroAttack, 5);
 }
 
 // Função auxiliar para fatiar horizontalmente a folha de sprites
@@ -679,9 +703,15 @@ class Enemy {
 
   Enemy(float x, float y, int type) {
     this.x = x; this.y = y; this.startY = y; this.type = type;
-    if (type == 0) { hp = 2; w = 48; h = 32; }
+    
+    if (type == 0) { 
+      hp = 2; 
+      w = 57; 
+      h = 96; 
+      this.y = y - 60; 
+    }
     if (type == 1) { hp = 1; w = 44; h = 44; y -= 45; startY = y; }
-    if (type == 2) { hp = 3; w = 50; h = 42; } // Inimigo Vermelho (Hunter)
+    if (type == 2) { hp = 3; w = 50; h = 42; } 
   }
 
   void update() {
@@ -760,18 +790,41 @@ class Enemy {
     pushMatrix();
     translate(x + w / 2, y + h / 2);
     if (dir < 0) scale(-1, 1);
-    if (type == 0) drawCrawler();
+    if (type == 0) drawCrawler(); 
     if (type == 1) drawFlyer();
-    if (type == 2) drawHunter(); // MODIFICADO: Passou a carregar as spritesheets do lobo
+    if (type == 2) drawHunter(); 
     popMatrix();
   }
 
   void drawCrawler() {
-    float pulse = sin(frameCount * 0.15) * 2; noStroke();
-    fill(hurtCooldown > 0 ? color(255, 220, 230) : color(42, 48, 75)); ellipse(0, pulse, w, h);
-    fill(230); ellipse(-11, -7 + pulse, 12, 12); ellipse(11, -7 + pulse, 12, 12);
-    fill(0); ellipse(-11, -7 + pulse, 5, 5); ellipse(11, -7 + pulse, 5, 5);
-    stroke(120, 180, 240); strokeWeight(3); line(-15, 12, -28, 22); line(15, 12, 28, 22);
+    float dx = player.x - x;
+    boolean sees = abs(dx) < 240 && abs(player.y - y) < 110;
+    
+    PImage frameAtual;
+    if (sees) {
+      int idx = (frameCount / 5) % framesSkeletoAttack.length;
+      frameAtual = framesSkeletoAttack[idx];
+    } else {
+      int idx = (frameCount / 6) % framesSkeletoWalk.length;
+      frameAtual = framesSkeletoWalk[idx];
+    }
+    
+    if (frameAtual != null) {
+      float renderH = h * 1.15; 
+      float aspecto = (float)frameAtual.width / frameAtual.height;
+      float renderW = renderH * aspecto;
+      
+      if (hurtCooldown > 0) {
+        tint(255, 100, 100); 
+      }
+      
+      imageMode(CENTER);
+      image(frameAtual, 0, (h - renderH) / 2, renderW, renderH);
+      
+      if (hurtCooldown > 0) {
+        noTint();
+      }
+    }
   }
 
   void drawFlyer() {
@@ -782,34 +835,28 @@ class Enemy {
     fill(0); ellipse(-8, -5, 4, 5); ellipse(8, -5, 4, 5);
   }
 
-  // MODIFICADO: Substituídos os blocos geométricos originais pelas animações fluidas do lobo
   void drawHunter() {
     float dx = player.x - x;
-    // Verifica se o lobo detectou o jogador baseado no raio de visão original
     boolean sees = abs(dx) < 360 && abs(player.y - y) < 170;
     
     PImage frameAtual;
     if (sees) {
-      // Se estiver perseguindo, usa a animação agressiva (7 frames) em velocidade rápida
       int idx = (frameCount / 4) % framesWolfAttack.length;
       frameAtual = framesWolfAttack[idx];
     } else {
-      // Se estiver calmo patrulhando, usa a animação estável de corrida (9 frames)
       int idx = (frameCount / 5) % framesWolfRun.length;
       frameAtual = framesWolfRun[idx];
     }
     
     if (frameAtual != null) {
-      // Escalona a imagem quadrada (128x128) para casar de forma proporcional com a colisão do jogo
       float renderH = h * 1.35; 
       float renderW = renderH; 
       
       if (hurtCooldown > 0) {
-        tint(255, 100, 100); // Pisca em vermelho ao sofrer dano do jogador
+        tint(255, 100, 100); 
       }
       
       imageMode(CENTER);
-      // O offset de Y ajusta dinamicamente as patas na linha do chão de acordo com o tamanho do colisor
       image(frameAtual, 0, (h - renderH) / 2, renderW, renderH);
       
       if (hurtCooldown > 0) {
@@ -820,7 +867,7 @@ class Enemy {
 }
 
 class Boss {
-  float x, y, w = 92, h = 96, vx = 0, vy = 0;
+  float x, y, w = 135, h = 135, vx = 0, vy = 0;
   int hp = 18, maxHp = 18, dir = -1, stateTimer = 70, hurtCooldown = 0;
   boolean grounded = false, dead = false;
 
@@ -872,15 +919,36 @@ class Boss {
   
   void show() {
     if (dead) return;
-    float pulse = sin(frameCount * 0.12) * 4;
-    pushMatrix(); translate(x + w / 2, y + h / 2); scale(dir, 1);
-    noStroke(); fill(hurtCooldown > 0 ? color(255, 220, 235) : color(80, 42, 92)); ellipse(0, 8 + pulse, w, h);
-    fill(160, 28, 55); beginShape(); vertex(-40, -5); vertex(40, -5); vertex(32, 55); vertex(0, 75); vertex(-32, 55); endShape(CLOSE);
-    fill(245); ellipse(0, -22 + pulse, 52, 48);
-    fill(245); triangle(-22, -48, -44, -96, -8, -45); triangle(22, -48, 44, -96, 8, -45);
-    fill(0); ellipse(-13, -23 + pulse, 8, 14); ellipse(13, -23 + pulse, 8, 14);
-    stroke(245); strokeWeight(5); line(32, 4, 88, -6);
-    stroke(255, 120, 170, 120); strokeWeight(3); line(42, -6, 96, -20); line(42, 8, 96, 18);
+    pushMatrix(); 
+    translate(x + w / 2, y + h / 2); 
+    scale(dir, 1);
+    
+    PImage frameAtual;
+    // CORRIGIDO/OTIMIZADO: Velocidade indexada dinamicamente pelo frameCount dividido de forma limpa
+    if (abs(player.x - x) < 160) {
+      int idx = (frameCount / 6) % framesMinotauroAttack.length;
+      frameAtual = framesMinotauroAttack[idx];
+    } else {
+      int idx = (frameCount / 5) % framesMinotauroWalk.length;
+      frameAtual = framesMinotauroWalk[idx];
+    }
+    
+    if (frameAtual != null) {
+      float renderH = h * 1.25; 
+      float aspecto = (float)frameAtual.width / frameAtual.height;
+      float renderW = renderH * aspecto;
+      
+      if (hurtCooldown > 0) {
+        tint(255, 100, 100); 
+      }
+      
+      imageMode(CENTER);
+      image(frameAtual, 0, (h - renderH) / 2, renderW, renderH);
+      
+      if (hurtCooldown > 0) {
+        noTint();
+      }
+    }
     popMatrix();
     showHealthBar();
   }
@@ -889,7 +957,9 @@ class Boss {
     float bw = 520, bh = 18, bx = camX + width / 2 - bw / 2, by = 102;
     fill(0, 180); rect(bx, by, bw, bh, 8);
     fill(175, 42, 95); rect(bx, by, bw * hp / maxHp, bh, 8);
-    fill(240); textAlign(CENTER, CENTER); textSize(16); text("DAMA DO ABISMO", camX + width / 2, by - 16);
+    fill(240); textAlign(CENTER, CENTER); textSize(16); 
+    
+    text("MINOTAURO DO ABISMO", camX + width / 2, by - 16);
   }
 }
 
